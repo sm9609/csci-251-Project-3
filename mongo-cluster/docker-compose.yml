@@ -1,0 +1,74 @@
+# MongoDB Replica Set - 3 Node Configuration
+# For Chaos Engineering Lab - CSCI-251
+#
+# Key concepts to explore:
+# - Primary election when the primary dies
+# - Majority quorum: with 2 of 3 nodes down the survivor refuses writes
+# - Write concern: w:1 vs w:"majority" - what "acknowledged" really means
+# - Rollback: a partitioned primary steps down and discards writes it
+#   acknowledged on its own
+# - Reading from secondaries (read preference) while there is no primary
+#
+# Start: docker-compose up -d
+# Initialize the replica set ONCE, after the containers are up:
+#   docker exec mongo-1 mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo-1:27017"},{_id:1,host:"mongo-2:27017"},{_id:2,host:"mongo-3:27017"}]})'
+# Check status:
+#   docker exec mongo-1 mongosh --quiet --eval 'rs.status().members.forEach(m => print(m.name, m.stateStr))'
+
+services:
+  mongo-1:
+    image: mongo:8
+    container_name: mongo-1
+    hostname: mongo-1
+    command: mongod --replSet rs0 --bind_ip_all
+    ports:
+      - "27017:27017"
+    networks:
+      mongo-net:
+        ipv4_address: 172.27.0.11
+    volumes:
+      - mongo-1-data:/data/db
+    cap_add:
+      - NET_ADMIN  # Required for iptables/tc chaos injection
+
+  mongo-2:
+    image: mongo:8
+    container_name: mongo-2
+    hostname: mongo-2
+    command: mongod --replSet rs0 --bind_ip_all
+    ports:
+      - "27018:27017"
+    networks:
+      mongo-net:
+        ipv4_address: 172.27.0.12
+    volumes:
+      - mongo-2-data:/data/db
+    cap_add:
+      - NET_ADMIN
+
+  mongo-3:
+    image: mongo:8
+    container_name: mongo-3
+    hostname: mongo-3
+    command: mongod --replSet rs0 --bind_ip_all
+    ports:
+      - "27019:27017"
+    networks:
+      mongo-net:
+        ipv4_address: 172.27.0.13
+    volumes:
+      - mongo-3-data:/data/db
+    cap_add:
+      - NET_ADMIN
+
+networks:
+  mongo-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.27.0.0/16
+
+volumes:
+  mongo-1-data:
+  mongo-2-data:
+  mongo-3-data:

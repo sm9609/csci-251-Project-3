@@ -1,0 +1,98 @@
+# RabbitMQ Cluster - 3 Node Configuration
+# For Chaos Engineering Lab - CS 480
+#
+# Key concepts to explore:
+# - Queue mirroring and message replication
+# - Network partition handling modes (pause_minority, autoheal, ignore)
+# - Message durability vs performance trade-offs
+# - Consumer rebalancing during failures
+# - Split-brain scenarios and resolution
+#
+# Start: docker-compose up -d
+# Access management UI: http://localhost:15672 (guest/guest)
+# Check cluster status: docker exec rabbitmq-1 rabbitmqctl cluster_status
+
+services:
+  rabbitmq-1:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq-1
+    hostname: rabbitmq-1
+    environment:
+      - RABBITMQ_ERLANG_COOKIE=chaos-lab-secret-cookie
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+      # Partition handling: pause_minority is safest for consistency
+      # Try changing to 'autoheal' or 'ignore' for different behaviors
+      - RABBITMQ_CLUSTER_PARTITION_HANDLING=pause_minority
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    networks:
+      rabbitmq-net:
+        ipv4_address: 172.30.0.11
+    volumes:
+      - rabbitmq-1-data:/var/lib/rabbitmq
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    cap_add:
+      - NET_ADMIN  # Required for iptables/tc chaos injection
+
+  rabbitmq-2:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq-2
+    hostname: rabbitmq-2
+    environment:
+      - RABBITMQ_ERLANG_COOKIE=chaos-lab-secret-cookie
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_CLUSTER_PARTITION_HANDLING=pause_minority
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    networks:
+      rabbitmq-net:
+        ipv4_address: 172.30.0.12
+    volumes:
+      - rabbitmq-2-data:/var/lib/rabbitmq
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    depends_on:
+      - rabbitmq-1
+    cap_add:
+      - NET_ADMIN
+
+  rabbitmq-3:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq-3
+    hostname: rabbitmq-3
+    environment:
+      - RABBITMQ_ERLANG_COOKIE=chaos-lab-secret-cookie
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_CLUSTER_PARTITION_HANDLING=pause_minority
+    ports:
+      - "5674:5672"
+      - "15674:15672"
+    networks:
+      rabbitmq-net:
+        ipv4_address: 172.30.0.13
+    volumes:
+      - rabbitmq-3-data:/var/lib/rabbitmq
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    depends_on:
+      - rabbitmq-1
+    cap_add:
+      - NET_ADMIN
+
+networks:
+  rabbitmq-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
+volumes:
+  rabbitmq-1-data:
+  rabbitmq-2-data:
+  rabbitmq-3-data:
