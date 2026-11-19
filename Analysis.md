@@ -1,0 +1,1 @@
+etcd has Partitions and Consistency but misses out on availability, If the Quorum goes down you won't be able to access any data but with the Quorum your guaranteed accurate data.
